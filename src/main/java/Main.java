@@ -2,64 +2,53 @@ import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileSystemView;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.List;
-
-import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
-import org.apache.poi.xwpf.usermodel.*;
+import static javax.swing.JOptionPane.showMessageDialog;
 
 public class Main {
+    static JPanel panel = new JPanel();
+    static JLabel currentSelectLabel = new JLabel();
+    static JTextField oriTextField = new JFormattedTextField();
+    static JTextField replaceTextField = new JFormattedTextField();
+    static File selectedFile = null;
+
     public static void main(String[] args) {
         setUI();
     }
 
-    public static void setUI(){
-        JFrame f = new JFrame("Doc/Docs Text Editor"); // creating instance of JFrame
-        JPanel p = new JPanel();
-        p.setLayout(new BoxLayout(p,BoxLayout.PAGE_AXIS));
-        JLabel l = setLabel();
-        JLabel l2 = new JLabel("Original:");
-//        l2.setBounds(70,200,100,40);
-        JLabel l3 = new JLabel("Replace:");
-//        l3.setBounds(70,250,100,40);
+    public static void setUI() {
+        JFrame f = new JFrame("文本替换工具"); // creating instance of JFrame
 
-        //--------------------------------------------------
-        //textfields
-        JTextField oriTextField = new JFormattedTextField();
-//        oriTextField.setBounds(125,200,150,40);
-        JTextField replaceTextField = new JFormattedTextField();
-//        replaceTextField.setBounds(125,250,150,40);
+        panel.setLayout(new BoxLayout(panel, BoxLayout.PAGE_AXIS));
+        JLabel l = setLabel();
+        JLabel l2 = new JLabel("原文字:");
+        JLabel l3 = new JLabel("替换文字:");
 
         JButton selectBtn = setSelectBtn();
         JButton convertBtn = setConvertBtn();
 
-        p.add(selectBtn);
-        p.add(l);
-        p.add(l2);
-        p.add(oriTextField);
-        p.add(l3);
-        p.add(replaceTextField);
-        p.add(convertBtn); //adding JButton to JFrame
-        f.add(p);
+        panel.add(selectBtn);
+        panel.add(currentSelectLabel);
+        panel.add(l);
+        panel.add(l2);
+        panel.add(oriTextField);
+        panel.add(l3);
+        panel.add(replaceTextField);
+        panel.add(convertBtn); //adding JButton to JFrame
+        f.add(panel);
 
         f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        f.setSize(400,200);
+        f.setSize(400, 200);
         f.setLocationRelativeTo(null);
         f.setVisible(true);
     }
 
-    public static JLabel setLabel(){
-        return new JLabel("Please enter the texts that your want to convert:");
+    public static JLabel setLabel() {
+        return new JLabel("请输入需要替换的文本:");
     }
 
-    public static JButton setSelectBtn(){
-        JButton selectBtn = new JButton("Choose file(s)");
+    public static JButton setSelectBtn() {
+        JButton selectBtn = new JButton("选择文件");
         selectBtn.addActionListener(e -> {
             try {
                 openFileChooser();
@@ -71,21 +60,27 @@ public class Main {
         return selectBtn;
     }
 
-    public static JButton setConvertBtn(){
-        return new JButton("Convert");
+    public static JButton setConvertBtn() {
+        JButton convertBtn = new JButton("替换");
+        convertBtn.addActionListener(e -> {
+            try {
+                convert();
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
+        return convertBtn;
     }
 
     public static void openFileChooser() throws IOException {
         JFileChooser jfc = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
         jfc.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
-        //only could select doc or docx files
         jfc.setFileFilter(new FileFilter() {
             @Override
             public boolean accept(File f) {
-                if(f.isDirectory()){
+                if (f.isDirectory()) {
                     return true;
-                }
-                else{
+                } else {
                     String filename = f.getName().toLowerCase();
                     return filename.endsWith(".doc") || filename.endsWith(".docx");
                 }
@@ -98,72 +93,36 @@ public class Main {
         });
 
         int returnValue = jfc.showOpenDialog(null);
-
         if (returnValue == JFileChooser.APPROVE_OPTION) {
-            File selectedFile = jfc.getSelectedFile();
-            if(selectedFile.isDirectory()){
-                File[] files = selectedFile.listFiles();
-                //todo process folders
-            }
-            else{
-                //todo when it is only a file
-                convert(selectedFile);
-            }
+            selectedFile = jfc.getSelectedFile();
+            showMessageDialog(null, "你选择了: " + selectedFile.getName());
         }
 
     }
 
-    public static String convert(File file){
+    public static void convert() throws IOException {
         String msg = "";
-        Path filePath = Paths.get(file.getAbsolutePath());
-        if (Files.exists(filePath)) {
-            //find file via its path
-            try (XWPFDocument doc = new XWPFDocument(Files.newInputStream(filePath))){
-                XWPFWordExtractor xwe = new XWPFWordExtractor(doc);
-                String docText = xwe.getText();
+        String originalText = oriTextField.getText().trim();
+        String replaceText = replaceTextField.getText().trim();
 
-                //for loop to replace text in paragraphs
-                for(XWPFParagraph p : doc.getParagraphs()){
-                    List<XWPFRun> runs = p.getRuns();
-                    if(runs!=null) {
-                        for(XWPFRun r: runs){
-                            String text = r.getText(0);
-                            if(text !=null && text.contains("Servlet")){
-                                text = text.replace("Servlet","Raymond");
-                                r.setText(text,0);
-                            }
-                        }
-                    }
-                }
-
-                //for loop to replace text in table(s)
-                for(XWPFTable tbl: doc.getTables()){
-                    for(XWPFTableRow row: tbl.getRows()){
-                        for(XWPFTableCell cell: row.getTableCells()){
-                            for(XWPFParagraph p: cell.getParagraphs()){
-                                for(XWPFRun run: p.getRuns()){
-                                    String text = run.getText(0);
-                                    if(text != null && text.contains("Servlet")){
-                                        text = text.replace("Servlet","Raymond");
-                                        run.setText(text,0);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                doc.write(new FileOutputStream("output.docx"));
-                msg = "Converted completed!";
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        } else {
-            System.out.println("File not found at the specified path.");
-            msg = "File not found at the specified path.";
+        if (originalText.isEmpty() || originalText.isBlank() || replaceText.isEmpty() || replaceText.isBlank()) {
+            msg = "转换失败，请填写要转换的文本";
         }
-        return msg;
+         else if (selectedFile == null) {
+            msg = "请选择要转换的文件.";
+        }
+         else if(selectedFile.length()==0){
+             msg = "此文件没有任何内容";
+        }else {
+            //single file
+            if (selectedFile.isFile()) {
+                msg = FileContentReplacer.ReplaceSingleFile(originalText,replaceText,selectedFile);
+                // folder(s)
+            } else {
+                msg = FileContentReplacer.ReplaceTextFolders(originalText,replaceText,selectedFile);
+            }
+        }
+        showMessageDialog(null, msg);
     }
+
 }
-
-
-//todo modify data in doc file
